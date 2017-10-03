@@ -40,11 +40,12 @@ class PSXView(BinaryView):
                 log_info("psx init")
 		try:
 			hdr = self.parent_view.read(0, 0x800)
-                        log_info("hdr len: %d" % len(hdr))
+                        # Remember, Pythons indexer is retarded: from:(to+1)
            	        self.init_pc    = struct.unpack("<L", hdr[0x10:0x14])[0]
            	        self.text_start = struct.unpack("<L", hdr[0x18:0x1c])[0]
            	        self.text_size  = struct.unpack("<L", hdr[0x1c:0x20])[0]
            	        self.init_sp    = struct.unpack("<L", hdr[0x30:0x34])[0]
+                        # log_debug("/info: %r" % hdr[0x4c:self.HDR_LEN])
            	        self.info       = hdr[0x4c:self.HDR_LEN]
 
 			log_info("PC:   %s" % format(self.init_pc,    '#010x'))
@@ -73,16 +74,12 @@ class PSXView(BinaryView):
                                 log_error("Size of aquired data is not same as header-prescribed TEXT size. Truncated file?")
 
           # add_auto_segment(start, length, data_offset, data_length, flags)
-                        # RAM (cached address space) 2M
-			self.add_auto_segment(0x8000000, 0x200000, 0, 0,
-                                              SegmentFlag.SegmentReadable |
-                                              SegmentFlag.SegmentWritable |
-                                              SegmentFlag.SegmentExecutable)
                         # Scratchpad RAM 1k
 			self.add_auto_segment(0x9F800000, 1024, 0, 0,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentWritable |
                                               SegmentFlag.SegmentExecutable)
+			self.add_auto_section("Scratchpad", 0x9F800000, 1024)
 
                         # FIXME: I seem to remember most IO access as
                         # in the KSEG1 region. This wont cover that.
@@ -92,27 +89,69 @@ class PSXView(BinaryView):
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentWritable |
                                               SegmentFlag.SegmentExecutable)
+			self.add_auto_section("IO Ports", 0x9F801000, 8*1024)
                         # Expansion 2 (IO Ports) 8k
 			self.add_auto_segment(0x9F802000, 8*1024, 0, 0,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentWritable |
                                               SegmentFlag.SegmentExecutable)
-                        # Expansion 3 (IO Ports) 2M
+			self.add_auto_section("Expansion region 2 (IO Ports)", 0x9F802000, 8*1024)
+                        # Expansion 3 2M
 			self.add_auto_segment(0x9FA00000, 0x200000, 0, 0,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentWritable |
                                               SegmentFlag.SegmentExecutable)
+			self.add_auto_section("Expansion region 3", 0x9FA00000, 0x200000)
                         # BIOS ROM 512k
 			self.add_auto_segment(0x9FC00000, 512*1024, 0, 0,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentExecutable)
-                        
-                        # BN has opinions about analyzing writable areas...
-                        # SegmentFlag.SegmentWritable |
+			self.add_auto_section("BIOS", 0x9FC00000, 512*1024)
+
+                        # RAM (cached address space) 2M
+                        # Dividing this into pre-EXE and post-EXE
+                        # space since it's the only way I've found to
+                        # not have the exe zeroed out
+
+                        # FIXME: The areas definitions overlap by one
+                        # byte: Getting one missing byte in the
+                        # viewer if I don't. Is BN using the wierd
+                        # python semantics of ranges?
+                        ramsize = 0x200000
+                        prestart = 0x80000000
+                        presize = (self.text_start - 0) - 0x80000000
+                        if(presize > 0):
+                                log_info("pre-RAM: %s - %s, size: %s" % (
+                                        format(prestart, '#010x'),
+                                        format(prestart+presize, '#010x'),
+                                        format(presize, '#010x')) )
+			        self.add_auto_segment(prestart, presize, 0, 0,
+                                                      SegmentFlag.SegmentReadable |
+                                                      SegmentFlag.SegmentWritable |
+                                                      SegmentFlag.SegmentExecutable)
+			        self.add_auto_section("RAM (pre EXE)", 0x80000000, presize)
+
+                        # Area for the actual executable. Will overlap
+                        # with RAM if it's a correct PSX-EXE
 			self.add_auto_segment(self.text_start, self.text_size,
                                               self.HDR_LEN, self.text_size,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentExecutable)
+			self.add_auto_section("PS-X EXE", self.text_start, self.text_size)
+
+                        # RAM (cached address space) 2M
+                        poststart = self.text_start+self.text_size
+                        postsize = (prestart+ramsize)-(self.text_start+self.text_size)
+                        if(postsize > 0):
+                                log_info("post-RAM: %s - %s, size: %s" % (
+                                        format(poststart, '#010x'),
+                                        format(poststart+postsize, '#010x'),
+                                        format(postsize, '#010x')) )
+                                self.add_auto_segment(poststart, postsize, 0, 0,
+                                                      SegmentFlag.SegmentReadable |
+                                                      SegmentFlag.SegmentWritable |
+                                                      SegmentFlag.SegmentExecutable)
+                                self.add_auto_section("RAM (post EXE)", poststart, postsize)
 
                         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.text_start, "_start"))
                         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.init_sp, "_stack")) # default: 0x801ffff0
