@@ -3,13 +3,13 @@
 import struct
 import traceback
 
-import pprint
-
 from binaryninja.architecture import Architecture
 from binaryninja.binaryview import BinaryView
 from binaryninja.types import Symbol
 from binaryninja.log import log_error, log_debug, log_info, log_alert, log_warn, log_to_stderr, log_to_stdout
 from binaryninja.enums import SegmentFlag, SymbolType
+
+from binaryninja.enums import SectionSemantics
 
 class PSXView(BinaryView):
 	name = "PSX"
@@ -27,17 +27,15 @@ class PSXView(BinaryView):
 
 	@classmethod
 	def is_valid_for_data(self, data):
-		log_info("hello PSX world")
 		hdr = data.read(0, self.HDR_LEN)
 		if len(hdr) < self.HDR_LEN:
 			return False
 		if hdr[0:8] != "PS-X EXE":
 			return False
-		log_info("Is PSX EXE!")
+		log_info("PSX EXE identified")
 		return True
 
 	def init(self):
-                log_info("psx init")
 		try:
 			hdr = self.parent_view.read(0, 0x800)
                         # Remember, Pythons indexer is retarded: from:(to+1)
@@ -138,6 +136,7 @@ class PSXView(BinaryView):
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentExecutable)
 			self.add_auto_section("PS-X EXE", self.text_start, self.text_size)
+                        # semantics = SectionSemantics.ReadOnlyCodeSectionSemantics)
 
                         # RAM (cached address space) 2M
                         poststart = self.text_start+self.text_size
@@ -153,9 +152,9 @@ class PSXView(BinaryView):
                                                       SegmentFlag.SegmentExecutable)
                                 self.add_auto_section("RAM (post EXE)", poststart, postsize)
 
-                        self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.text_start, "_start"))
+                        self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.init_pc, "_start"))
                         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.init_sp, "_stack")) # default: 0x801ffff0
-                        self.add_entry_point(self.text_start)
+                        self.add_entry_point(self.init_pc)
 
 			return True
 		except:
