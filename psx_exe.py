@@ -15,7 +15,7 @@ class PSXView(BinaryView):
 	name = "PSX"
 	long_name = "PSX-EXE"
 
-        HDR_LEN = 0x800
+        HDR_SIZE = 0x800
 
 	def __init__(self, data):
 		BinaryView.__init__(self, parent_view = data, file_metadata = data.file)
@@ -27,8 +27,8 @@ class PSXView(BinaryView):
 
 	@classmethod
 	def is_valid_for_data(self, data):
-		hdr = data.read(0, self.HDR_LEN)
-		if len(hdr) < self.HDR_LEN:
+		hdr = data.read(0, self.HDR_SIZE)
+		if len(hdr) < self.HDR_SIZE:
 			return False
 		if hdr[0:8] != "PS-X EXE":
 			return False
@@ -43,8 +43,9 @@ class PSXView(BinaryView):
            	        self.text_start = struct.unpack("<L", hdr[0x18:0x1c])[0]
            	        self.text_size  = struct.unpack("<L", hdr[0x1c:0x20])[0]
            	        self.init_sp    = struct.unpack("<L", hdr[0x30:0x34])[0]
-                        # log_debug("/info: %r" % hdr[0x4c:self.HDR_LEN])
-           	        self.info       = hdr[0x4c:self.HDR_LEN]
+           	        self.info       = hdr[0x4c:self.HDR_SIZE]
+                        # log_debug("/info: %r" % self.info)
+                        log_debug("/info size: %s" % format(len(self.info), '#010x'))
 
 			log_info("PC:   %s" % format(self.init_pc,    '#010x'))
 			log_info("TEXT: %s" % format(self.text_start, '#010x'))
@@ -52,7 +53,7 @@ class PSXView(BinaryView):
 			log_info("SP:   %s" % format(self.init_sp,    '#010x'))
 			log_info("info: %s" % self.info)
 
-                        # PSX came with 2M, but the BIOS supports 8(?)
+                        # PSX came with 2M, but the BIOS supports 8
                         # for dev machines. Supposed be multiple if
                         # 2048, but that is not required for the
                         # method used to sideload homebrew. (FIXME: Is
@@ -66,7 +67,7 @@ class PSXView(BinaryView):
                         if(self.text_size % 2048 != 0):
                                 log_warn("size not divisable by 2k")
 
-                        text = self.parent_view.read(self.HDR_LEN, self.text_size)
+                        text = self.parent_view.read(self.HDR_SIZE, self.text_size)
                         log_info("Actual size of aquired TEXT: %s" % format(len(text), '#010x'))
                         if( len(text) != self.text_size ):
                                 log_error("Size of aquired data is not same as header-prescribed TEXT size. Truncated file?")
@@ -132,7 +133,7 @@ class PSXView(BinaryView):
                         # Area for the actual executable. Will overlap
                         # with RAM if it's a correct PSX-EXE
 			self.add_auto_segment(self.text_start, self.text_size,
-                                              self.HDR_LEN, self.text_size,
+                                              self.HDR_SIZE, self.text_size,
                                               SegmentFlag.SegmentReadable |
                                               SegmentFlag.SegmentExecutable)
 			self.add_auto_section("PS-X EXE", self.text_start, self.text_size)
