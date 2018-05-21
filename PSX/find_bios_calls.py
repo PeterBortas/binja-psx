@@ -111,7 +111,7 @@ def psx_get_type(calladdr, callnr):
     return res
 
 # This is a mess but does what I need
-def find_psx_bios_calls(view):
+def run_plugin(view):
     for f in view.functions:
         if len(f.medium_level_il) == 2:
             tok0 = f.medium_level_il[0].tokens
@@ -163,4 +163,4 @@ def find_psx_bios_calls(view):
                 else:
                     log_warn("Unknown syscall %s" % callnr)
                         
-bn.PluginCommand.register('Find BIOS calls', 'Find PSX BIOS calls and annotate them.', find_psx_bios_calls)
+# bn.PluginCommand.register('Find BIOS calls', 'Find PSX BIOS calls and annotate them.', find_psx_bios_calls)
