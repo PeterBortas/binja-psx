@@ -1,6 +1,3 @@
-## import os
-## import json
-
 from binaryninja import PluginCommand
 from PSX import find_bios_calls,exe
 
