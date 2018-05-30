@@ -107,60 +107,48 @@ def psx_get_type(calladdr, callnr):
 #    log_info("Looking up %s call %s" % (format(calladdr, '#06x'),
 #                                        format(callnr, '#06x')))
     res = psx_bios_calls[calladdr][callnr]
-#    log_info("L5: %r" % res)
     return res
+
+def safe_psx_set_type(view, f, calladdr, callnr):
+    try:
+        type = psx_get_type(calladdr, callnr)
+    except:
+        if calladdr:
+            log_error("failed to lookup %s call %s" %
+                      (format(calladdr, '#5x'),
+                       format(callnr, '#05x')))
+        else:
+            log_error("failed to lookup syscall %s" % callnr)
+    if type:
+        new_name = "PSX_"+ type[0]
+        f.name = new_name
+        i = 0
+        # TODO: Avoid touching user defined functions
+        while f.name != new_name:
+            log_warn("Unable to change name to %r, duplicate? Trying numbered alias" % new_name)
+            new_name = "PSX_"+ type[0] +"_copy_"+ str(i)
+            f.name = new_name
+            f.set_user_type(view.parse_type_string(type[1])[0])
+    else:
+        if calladdr:
+            log_warn("Unknown %s call: %s" %
+                     (format(calladdr, '#5x'),
+                      format(callnr, '#05x')))
+        else:
+            log_warn("Unknown syscall %s" % callnr)
 
 # This is a mess but does what I need
 def run_plugin(view):
     for f in view.functions:
         if len(f.medium_level_il) == 2:
             tok0 = f.medium_level_il[0].tokens
-#            log_warn("%r" % tok0)
 	    if str(tok0[0]) == '$t1' and str(tok0[1]) == ' = ':
 	        callnr = int(str(tok0[2]), 16)
 	        tok1 = f.medium_level_il[1].tokens
                 if str(tok1[0]) == 'jump(' and str(tok1[2]) == ')':
 	            calladdr = int(str(tok1[1]), 16)
-                    type = False
-                    try:
-                        type = psx_get_type(calladdr, callnr)
-                    except:
-                        log_error("failed to lookup %s call %s" %
-                                  (format(calladdr, '#5x'),
-                                   format(callnr, '#05x')))
-                    if type:
-                        new_name = "PSX_"+ type[0]
-                        f.name = new_name
-                        i = 0
-                        while f.name != new_name:
-                            log_warn("Unable to change name to %r, duplicate? Trying numbered alias" % new_name)
-                            new_name = "PSX_"+ type[0] +"_copy_"+ str(i)
-                            f.name = new_name
-                            
-                        f.set_user_type(view.parse_type_string(type[1])[0])
-                    else:
-                        log_warn("Unknown %s call: %s" %
-                                 (format(calladdr, '#5x'),
-                                  format(callnr, '#05x')))
+                    safe_psx_set_type(view, f, calladdr, callnr)
             # TODO: Only verified for syscall(2) stub
 	    if str(tok0[0]) == '$v0' and str(tok0[1]) == ' = ' and str(tok0[2]) == 'syscall':
 	        callnr = int(str(tok0[4]))
-                type = False
-                try:
-                    type = psx_get_type(0, callnr)
-                except:
-                    log_error("failed to lookup syscall %s" % callnr)
-                if type:
-                    new_name = "PSX_"+ type[0]
-                    f.name = new_name
-                    i = 0
-                    while f.name != new_name:
-                        log_warn("Unable to change name to %r, duplicate? Trying numbered alias" % new_name)
-                        new_name = "PSX_"+ type[0] +"_copy_"+ str(i)
-                        f.name = new_name
-                        
-                    f.set_user_type(view.parse_type_string(type[1])[0])
-                else:
-                    log_warn("Unknown syscall %s" % callnr)
-                        
-# bn.PluginCommand.register('Find BIOS calls', 'Find PSX BIOS calls and annotate them.', find_psx_bios_calls)
+                safe_psx_set_type(view, f, 0, callnr)

@@ -8,8 +8,10 @@ from binaryninja.binaryview import BinaryView
 from binaryninja.types import Symbol
 from binaryninja.log import log_error, log_debug, log_info, log_alert, log_warn, log_to_stderr, log_to_stdout
 from binaryninja.enums import SegmentFlag, SymbolType
-
 from binaryninja.enums import SectionSemantics
+from binaryninja import PluginCommand
+
+from .find_bios_calls import run_plugin as find_bios_calls_run
 
 # Playstation memory map (mostly iomapped control registers)
 #
@@ -430,6 +432,10 @@ class PSXView(BinaryView):
                         # are hardcoded right now.
                         for addr, symbol in psx_memmap_constants.iteritems():
                                 self.define_auto_symbol(Symbol(SymbolType.DataSymbol, addr, symbol))
+
+                        PluginCommand.register('Find PSX BIOS calls',
+                                               'Find PSX BIOS calls and rename them.',
+                                               find_bios_calls_run)
 
 			return True
 		except:
