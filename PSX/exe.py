@@ -447,5 +447,3 @@ class PSXView(BinaryView):
 
 	def perform_get_entry_point(self):
 		return self.init_pc
-
-PSXView.register()
