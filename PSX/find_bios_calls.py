@@ -139,6 +139,7 @@ def safe_psx_set_type(view, f, calladdr, callnr):
 
 # This is a mess but does what I need
 def run_plugin(view):
+    log_info("Locating PSX BIOS calls")
     for f in view.functions:
         if len(f.medium_level_il) == 2:
             tok0 = f.medium_level_il[0].tokens

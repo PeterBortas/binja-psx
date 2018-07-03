@@ -433,9 +433,15 @@ class PSXView(BinaryView):
                         for addr, symbol in psx_memmap_constants.iteritems():
                                 self.define_auto_symbol(Symbol(SymbolType.DataSymbol, addr, symbol))
 
-                        PluginCommand.register('Find PSX BIOS calls',
-                                               'Find PSX BIOS calls and rename them.',
-                                               find_bios_calls_run)
+                        # Uncomment this and remove the hook if you want to run
+                        # function BIOS calls manually.
+
+                        #PluginCommand.register('Find PSX BIOS calls',
+                        #                       'Find PSX BIOS calls and rename them.',
+                        #                       find_bios_calls_run)
+
+                        # Run PSX BIOS function finder after analysis
+                        self.add_analysis_completion_event(lambda _:find_bios_calls_run(self))
 
 			return True
 		except:
